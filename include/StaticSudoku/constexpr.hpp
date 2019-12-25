@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <iostream>
 #include <stdexcept>
 #include <type_traits>
 
@@ -87,7 +88,7 @@ public:
 private:
     constexpr void throwIfOOB() const {
         if (idx_ >= NUM_BOARD_TILES) {
-            throw std::out_of_range{"Past end of board"};
+            //throw std::out_of_range{"Past end of board"};
         }
     }
 
@@ -180,7 +181,15 @@ struct ColToBoardIdxPolicy {
 
 struct ColStepForwardPolicy {
     constexpr SudokuIdx operator()(SudokuIdx currentBoardIdx, SudokuIdx increase) const {
-        return currentBoardIdx + increase * NUM_TILES;
+        SudokuIdx resultBoardIdx = currentBoardIdx;
+        for (std::uint64_t i = 0; i < increase.value(); ++i) {
+            if (resultBoardIdx / 9 == SudokuIdx{8}) {
+                resultBoardIdx = resultBoardIdx % 9 + SudokuIdx{1};
+            } else {
+                resultBoardIdx = resultBoardIdx + increase * NUM_TILES;
+            }
+        }
+        return resultBoardIdx;
     }
 };
 
@@ -202,9 +211,10 @@ struct BoxStepForwardPolicy {
             SudokuIdx resultBoardRow = resultBoardIdx / NUM_TILES;
             if (resultBoardIdx % NUM_TILES == SudokuIdx{8}) {
                 if (resultBoardRow % 3 == SudokuIdx{2}) {
-                    throw std::out_of_range{"Outside 3x3 square"};
+                    resultBoardIdx += SudokuIdx{1};
+                } else {
+                    resultBoardIdx += SudokuIdx{7};
                 }
-                resultBoardIdx += SudokuIdx{7};
             } else {
                 ++resultBoardIdx;
             }
@@ -230,7 +240,7 @@ constexpr bool all_of(IterT begin, IterT end, PredicateT predicate) {
 template<typename IterT, typename PredicateT>
 constexpr bool none_of(IterT begin, IterT end, PredicateT predicate) {
     for (IterT it = begin; it != end; ++it) {
-        if (predicate(*begin)) {
+        if (predicate(*it)) {
             return false;
         }
     }
@@ -242,10 +252,6 @@ constexpr bool tileValid(const TileType &tile) noexcept {
     return 1 <= tile and tile <= 9;
 }
 
-constexpr bool boardValid(const ArrayType &array) {
-    return all_of(array.cbegin(), array.cend(), tileValid);
-}
-
 constexpr SudokuIdx getRowIdx(SudokuIdx boardIdx) noexcept {
     return boardIdx / NUM_TILES;
 }
@@ -255,7 +261,7 @@ constexpr SudokuIdx getColIdx(SudokuIdx boardIdx) noexcept {
 }
 
 constexpr SudokuIdx getBoxIdx(SudokuIdx boardIdx) noexcept {
-    return (boardIdx / 9 / 3) * 3 + (boardIdx / 3);
+    return (boardIdx / 9 / 3) + (boardIdx / 9) % 3;
 }
 
 constexpr bool uniqueInRow(const ArrayType &array, SudokuIdx idx, TileType proposedValue) {
@@ -279,8 +285,20 @@ constexpr bool uniqueInBox(const ArrayType &array, SudokuIdx idx, TileType propo
     return none_of(beginIter, endIter, [proposedValue](TileType tileValue) {return tileValue == proposedValue;});
 }
 
-constexpr bool isValidValueForIdx(const ArrayType &array, SudokuIdx idx, TileType proposedValue) {
-    return uniqueInRow(array, idx, proposedValue) and uniqueInCol(array, idx, proposedValue) and uniqueInBox(array, idx, proposedValue);
+/*constexpr*/ bool isValidValueForIdx(const ArrayType &array, SudokuIdx idx, TileType proposedValue) {
+    const bool validValue = tileValid(proposedValue);
+    const bool validRow = uniqueInRow(array, idx, proposedValue);
+    const bool validCol = uniqueInCol(array, idx, proposedValue);
+    const bool validBox = uniqueInBox(array, idx, proposedValue);
+    std::cout << idx.value() << ' ' << proposedValue << std::endl;
+    return validValue and validRow and validCol and validBox;
+}
+
+constexpr bool boardValid(const ArrayType &array) {
+    const auto check = [&array] (auto rawIdx) {
+        return isValidValueForIdx(array, SudokuIdx{rawIdx}, array.at(rawIdx));
+    };
+    return all_of(array.cbegin(), array.cend(), check);
 }
 
 using IsProvidedValueBitField = std::array<bool, NUM_BOARD_TILES>;
@@ -290,9 +308,10 @@ constexpr IsProvidedValueBitField getIsProvidedValueBitField(const ArrayType &ar
     for (std::uint64_t i = 0; i < array.size(); ++i) {
         result[i] = 1 <= array.at(i) and array.at(i) <= 9;
     }
+    return result;
 }
 
-constexpr bool tryNumber(ArrayType &array, const IsProvidedValueBitField &isProvidedValue, SudokuIdx workingIdx, TileType tileToAttempt) {
+/*constexpr*/ bool tryNumber(ArrayType &array, const IsProvidedValueBitField &isProvidedValue, SudokuIdx workingIdx, TileType tileToAttempt) {
     if (not isValidValueForIdx(array, workingIdx, tileToAttempt)) {
         return false;
     }
@@ -302,6 +321,13 @@ constexpr bool tryNumber(ArrayType &array, const IsProvidedValueBitField &isProv
 
     while (isProvidedValue.at(nextWorkingIdx.value())) {
         ++nextWorkingIdx;
+        if (nextWorkingIdx > SudokuIdx{NUM_BOARD_TILES}) {
+            const bool isSolution = boardValid(array);
+            if (not isSolution) {
+                array[workingIdx.value()] = 0;
+            }
+            return isSolution;
+        }
     }
 
     for (TileType nextTileToAttempt = 1; nextTileToAttempt < 10; ++nextTileToAttempt) {
@@ -309,17 +335,18 @@ constexpr bool tryNumber(ArrayType &array, const IsProvidedValueBitField &isProv
             return true;
         }
     }
+    array[workingIdx.value()] = 0;
     return false;
 }
 
 } // namespace Details
 
-constexpr Details::ArrayType constexprSolve(const Details::ArrayType &array) {
+/*constexpr*/ Details::ArrayType constexprSolve(const Details::ArrayType &array) {
     Details::ArrayType attemptArray = array;
     Details::IsProvidedValueBitField isProvidedValue{true};
     isProvidedValue = Details::getIsProvidedValueBitField(array);
 
-    Details::SudokuIdx nextWorkingIdx{1};
+    Details::SudokuIdx nextWorkingIdx{0};
     while (isProvidedValue.at(nextWorkingIdx.value())) {
         ++nextWorkingIdx;
     }
