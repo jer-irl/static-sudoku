@@ -119,7 +119,7 @@ public:
     {
     }
 
-    [[nodiscard]] SudokuIdx boardIdx() const {
+    [[nodiscard]] constexpr SudokuIdx boardIdx() const {
         return tileIdx_;
     }
 
