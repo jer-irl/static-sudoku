@@ -1,7 +1,8 @@
+#pragma once
+
 #include <algorithm>
 #include <array>
 #include <cstdint>
-#include <iostream>
 #include <stdexcept>
 #include <type_traits>
 
@@ -24,6 +25,12 @@ public:
 
     friend constexpr SudokuIdx operator+(SudokuIdx lhs, SudokuIdx rhs) {
         SudokuIdx result{lhs.idx_ + rhs.idx_};
+        result.throwIfOOB();
+        return result;
+    }
+
+    friend constexpr SudokuIdx operator-(SudokuIdx lhs, SudokuIdx rhs) {
+        SudokuIdx result{lhs.idx_ - rhs.idx_};
         result.throwIfOOB();
         return result;
     }
@@ -83,6 +90,11 @@ public:
 
     friend constexpr bool operator>=(SudokuIdx lhs, SudokuIdx rhs) noexcept {
         return lhs.idx_ >= rhs.idx_;
+    }
+
+    template<typename OStreamT>
+    friend OStreamT &operator<<(OStreamT &os, const SudokuIdx &rhs) {
+        return os << "SudokuIdx{" << rhs.idx_ << "}";
     }
 
 private:
@@ -186,7 +198,7 @@ struct ColStepForwardPolicy {
             if (resultBoardIdx / 9 == SudokuIdx{8}) {
                 resultBoardIdx = resultBoardIdx % 9 + SudokuIdx{1};
             } else {
-                resultBoardIdx = resultBoardIdx + increase * NUM_TILES;
+                resultBoardIdx = resultBoardIdx + SudokuIdx{NUM_TILES};
             }
         }
         return resultBoardIdx;
@@ -208,14 +220,28 @@ struct BoxStepForwardPolicy {
     constexpr SudokuIdx operator()(SudokuIdx currentBoardIdx, SudokuIdx increase) const {
         SudokuIdx resultBoardIdx = currentBoardIdx;
         for (std::uint64_t i = 0; i < increase.value(); ++i) {
-            SudokuIdx resultBoardRow = resultBoardIdx / NUM_TILES;
-            if (resultBoardIdx % NUM_TILES == SudokuIdx{8}) {
+            if ((resultBoardIdx % NUM_TILES) % 3 == SudokuIdx{2}) {
+                const SudokuIdx resultBoardRow = resultBoardIdx / NUM_TILES;
+                const SudokuIdx resultBoardCol = resultBoardIdx % NUM_TILES;
+                const SudokuIdx resultBoxColIdx = (resultBoardIdx % 9) / 3;
+                // If we are in the last position in the box
                 if (resultBoardRow % 3 == SudokuIdx{2}) {
-                    resultBoardIdx += SudokuIdx{1};
-                } else {
+                    // If we are jumping to the next box row
+                    if (resultBoxColIdx % 3 == SudokuIdx{2}) {
+                        resultBoardIdx += SudokuIdx{1};
+                    }
+                    // If we are jumping to the next box in the same box row
+                    else {
+                        resultBoardIdx = (resultBoardRow - SudokuIdx{2}) * NUM_TILES + resultBoardCol + SudokuIdx{1};
+                    }
+                }
+                // If we are in the last position in the first two box sub-rows
+                else {
                     resultBoardIdx += SudokuIdx{7};
                 }
-            } else {
+            }
+            // If we aren't in the last position in a box sub-row
+            else {
                 ++resultBoardIdx;
             }
         }
@@ -261,7 +287,9 @@ constexpr SudokuIdx getColIdx(SudokuIdx boardIdx) noexcept {
 }
 
 constexpr SudokuIdx getBoxIdx(SudokuIdx boardIdx) noexcept {
-    return (boardIdx / 9 / 3) + (boardIdx / 9) % 3;
+    const SudokuIdx boxRowIdx = boardIdx / 27;
+    const SudokuIdx boxColIdx = (boardIdx % 9) / 3;
+    return boxRowIdx * 3 + boxColIdx;
 }
 
 constexpr bool uniqueInRow(const ArrayType &array, SudokuIdx idx, TileType proposedValue) {
@@ -290,7 +318,6 @@ constexpr bool uniqueInBox(const ArrayType &array, SudokuIdx idx, TileType propo
     const bool validRow = uniqueInRow(array, idx, proposedValue);
     const bool validCol = uniqueInCol(array, idx, proposedValue);
     const bool validBox = uniqueInBox(array, idx, proposedValue);
-    std::cout << idx.value() << ' ' << proposedValue << std::endl;
     return validValue and validRow and validCol and validBox;
 }
 
