@@ -4,7 +4,7 @@
 
 namespace StaticSudoku::Test {
 
-TEST_CASE("Row iteration") {
+TEST_CASE("constexpr row iteration") {
     SECTION("Can iterate from beginning of row") {
         Details::RowIterator iter0{solved0, Details::SudokuIdx{2}};
         CHECK(*iter0 == 4);
@@ -49,7 +49,7 @@ TEST_CASE("Row iteration") {
     }
 }
 
-TEST_CASE("Column iteration") {
+TEST_CASE("constexpr column iteration") {
     SECTION("Can iterate from beginning of column") {
         Details::ColIterator iter0{solved0, Details::SudokuIdx{2}};
         CHECK(*iter0 == 6);
@@ -96,7 +96,7 @@ TEST_CASE("Column iteration") {
     }
 }
 
-TEST_CASE("Box iteration") {
+TEST_CASE("constexpr box iteration") {
     SECTION("Can iterate from beginning of box") {
         Details::BoxIterator iter0{solved0, Details::SudokuIdx{2}};
         CHECK(*iter0 == 4);
@@ -141,8 +141,44 @@ TEST_CASE("Box iteration") {
         CHECK(not Details::uniqueInBox(unsolved9, Details::SudokuIdx{0}, 2));
 
         CHECK(not Details::uniqueInBox(solved9, Details::SudokuIdx{0}, 4));
-        CHECK(not Details::uniqueInBox(solved9, Details::SudokuIdx{20}, 6));
+        CHECK(Details::uniqueInBox(solved9, Details::SudokuIdx{20}, 6));
     }
+}
+
+TEST_CASE("Constexpr board validity check") {
+    CHECK(Details::boardValid(solved0));
+    CHECK(Details::boardValid(solved1));
+    CHECK(Details::boardValid(solved2));
+    CHECK(Details::boardValid(solved3));
+    CHECK(Details::boardValid(solved4));
+    CHECK(Details::boardValid(solved5));
+    CHECK(Details::boardValid(solved6));
+    CHECK(Details::boardValid(solved7));
+    CHECK(Details::boardValid(solved8));
+    CHECK(Details::boardValid(solved9));
+    CHECK(not Details::boardValid(unsolved0));
+    CHECK(not Details::boardValid(unsolved1));
+    CHECK(not Details::boardValid(unsolved2));
+    CHECK(not Details::boardValid(unsolved3));
+    CHECK(not Details::boardValid(unsolved4));
+    CHECK(not Details::boardValid(unsolved5));
+    CHECK(not Details::boardValid(unsolved6));
+    CHECK(not Details::boardValid(unsolved7));
+    CHECK(not Details::boardValid(unsolved8));
+    CHECK(not Details::boardValid(unsolved9));
+}
+
+TEST_CASE("Solving with constexpr") {
+    CHECK(constexprSolve(unsolved0) == solved0);
+    CHECK(constexprSolve(unsolved1) == solved1);
+    CHECK(constexprSolve(unsolved2) == solved2);
+    CHECK(constexprSolve(unsolved3) == solved3);
+    CHECK(constexprSolve(unsolved4) == solved4);
+    CHECK(constexprSolve(unsolved5) == solved5);
+    CHECK(constexprSolve(unsolved6) == solved6);
+    CHECK(constexprSolve(unsolved7) == solved7);
+    CHECK(constexprSolve(unsolved8) == solved8);
+    CHECK(constexprSolve(unsolved9) == solved9);
 }
 
 } // namespace StaticSudoku::Test

@@ -12,7 +12,7 @@ constexpr StaticSudoku::Details::ArrayType unsolved{
         0, 2, 1, 7, 0, 0, 0, 0, 6
 };
 
-StaticSudoku::Details::ArrayType solved = StaticSudoku::constexprSolve(unsolved);
+constexpr StaticSudoku::Details::ArrayType solved = StaticSudoku::constexprSolve(unsolved);
 
 int main() {
     return 0;

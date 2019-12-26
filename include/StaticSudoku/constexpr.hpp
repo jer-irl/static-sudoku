@@ -119,6 +119,10 @@ public:
     {
     }
 
+    [[nodiscard]] SudokuIdx boardIdx() const {
+        return tileIdx_;
+    }
+
     friend constexpr const TileType &operator*(const SudokuIterator &iterator) {
         return iterator.array_.at(iterator.tileIdx_.value());
     }
@@ -293,27 +297,42 @@ constexpr SudokuIdx getBoxIdx(SudokuIdx boardIdx) noexcept {
 }
 
 constexpr bool uniqueInRow(const ArrayType &array, SudokuIdx idx, TileType proposedValue) {
-    SudokuIdx rowIdx = getRowIdx(idx);
+    const SudokuIdx rowIdx = getRowIdx(idx);
     const RowIterator beginIter{array, rowIdx};
     const RowIterator endIter{array, rowIdx + SudokuIdx{1}};
-    return none_of(beginIter, endIter, [proposedValue](TileType tileValue) {return tileValue == proposedValue;});
+    for (RowIterator iter = beginIter; iter != endIter; ++iter) {
+        if (*iter == proposedValue and iter.boardIdx() != idx) {
+            return false;
+        }
+    }
+    return true;
 }
 
 constexpr bool uniqueInCol(const ArrayType &array, SudokuIdx idx, TileType proposedValue) {
-    SudokuIdx colIdx = getColIdx(idx);
+    const SudokuIdx colIdx = getColIdx(idx);
     const ColIterator beginIter{array, colIdx};
     const ColIterator endIter{array, colIdx + SudokuIdx{1}};
-    return none_of(beginIter, endIter, [proposedValue](TileType tileValue) {return tileValue == proposedValue;});
+    for (ColIterator iter = beginIter; iter != endIter; ++iter) {
+        if (*iter == proposedValue and iter.boardIdx() != idx) {
+            return false;
+        }
+    }
+    return true;
 }
 
 constexpr bool uniqueInBox(const ArrayType &array, SudokuIdx idx, TileType proposedValue) {
-    SudokuIdx boxIdx = getBoxIdx(idx);
+    const SudokuIdx boxIdx = getBoxIdx(idx);
     const BoxIterator beginIter{array, boxIdx};
     const BoxIterator endIter{array, boxIdx + SudokuIdx{1}};
-    return none_of(beginIter, endIter, [proposedValue](TileType tileValue) {return tileValue == proposedValue;});
+    for (BoxIterator iter = beginIter; iter != endIter; ++iter) {
+        if (*iter == proposedValue and iter.boardIdx() != idx) {
+            return false;
+        }
+    }
+    return true;
 }
 
-/*constexpr*/ bool isValidValueForIdx(const ArrayType &array, SudokuIdx idx, TileType proposedValue) {
+constexpr bool isValidValueForIdx(const ArrayType &array, SudokuIdx idx, TileType proposedValue) {
     const bool validValue = tileValid(proposedValue);
     const bool validRow = uniqueInRow(array, idx, proposedValue);
     const bool validCol = uniqueInCol(array, idx, proposedValue);
@@ -338,7 +357,7 @@ constexpr IsProvidedValueBitField getIsProvidedValueBitField(const ArrayType &ar
     return result;
 }
 
-/*constexpr*/ bool tryNumber(ArrayType &array, const IsProvidedValueBitField &isProvidedValue, SudokuIdx workingIdx, TileType tileToAttempt) {
+constexpr bool tryNumber(ArrayType &array, const IsProvidedValueBitField &isProvidedValue, SudokuIdx workingIdx, TileType tileToAttempt) {
     if (not isValidValueForIdx(array, workingIdx, tileToAttempt)) {
         return false;
     }
@@ -346,9 +365,17 @@ constexpr IsProvidedValueBitField getIsProvidedValueBitField(const ArrayType &ar
 
     SudokuIdx nextWorkingIdx = workingIdx + SudokuIdx{1};
 
+    if (nextWorkingIdx >= SudokuIdx{NUM_BOARD_TILES}) {
+        const bool isSolution = boardValid(array);
+        if (not isSolution) {
+            array[workingIdx.value()] = 0;
+        }
+        return isSolution;
+    }
+
     while (isProvidedValue.at(nextWorkingIdx.value())) {
         ++nextWorkingIdx;
-        if (nextWorkingIdx > SudokuIdx{NUM_BOARD_TILES}) {
+        if (nextWorkingIdx >= SudokuIdx{NUM_BOARD_TILES}) {
             const bool isSolution = boardValid(array);
             if (not isSolution) {
                 array[workingIdx.value()] = 0;
@@ -368,7 +395,7 @@ constexpr IsProvidedValueBitField getIsProvidedValueBitField(const ArrayType &ar
 
 } // namespace Details
 
-/*constexpr*/ Details::ArrayType constexprSolve(const Details::ArrayType &array) {
+constexpr Details::ArrayType constexprSolve(const Details::ArrayType &array) {
     Details::ArrayType attemptArray = array;
     Details::IsProvidedValueBitField isProvidedValue{true};
     isProvidedValue = Details::getIsProvidedValueBitField(array);
